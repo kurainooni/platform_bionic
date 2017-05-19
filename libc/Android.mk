@@ -2,6 +2,9 @@ LOCAL_PATH:= $(call my-dir)
 
 include $(LOCAL_PATH)/arch-$(TARGET_ARCH)/syscalls.mk
 
+# add by kfx
+MEMCPY_POLICY := rockchip
+
 # Define the common source files for all the libc instances
 # =========================================================
 libc_common_src_files := \
@@ -360,20 +363,23 @@ libc_common_src_files += \
 	arch-arm/bionic/libgcc_compat.c \
 	arch-arm/bionic/tkill.S \
 	arch-arm/bionic/tgkill.S \
-	arch-arm/bionic/memcmp.S \
 	arch-arm/bionic/memcmp16.S \
-	arch-arm/bionic/memcpy.S \
-	arch-arm/bionic/memset.S \
 	arch-arm/bionic/setjmp.S \
 	arch-arm/bionic/sigsetjmp.S \
 	arch-arm/bionic/strlen.c.arm \
-	arch-arm/bionic/strcpy.S \
-	arch-arm/bionic/strcmp.S \
 	arch-arm/bionic/syscall.S \
 	string/memmove.c.arm \
 	string/bcopy.c \
 	string/strncmp.c \
 	unistd/socketcalls.c
+ifneq ($(MEMCPY_POLICY),rockchip)
+libc_common_src_files += \
+	arch-arm/bionic/memcmp.S \
+	arch-arm/bionic/memset.S \
+	arch-arm/bionic/memcpy.S \
+	arch-arm/bionic/strcmp.S \
+	arch-arm/bionic/strcpy.S
+endif
 
 # These files need to be arm so that gdbserver
 # can set breakpoints in them without messing
@@ -583,6 +589,20 @@ ALL_GENERATED_SOURCES += $(GEN)
 # To enable malloc leak check for statically linked programs, add
 # "WITH_MALLOC_CHECK_LIBC_A := true" to buildspec.mk
 WITH_MALLOC_CHECK_LIBC_A := $(strip $(WITH_MALLOC_CHECK_LIBC_A))
+# ========================================================
+# libmemopt.a
+# ========================================================
+ifeq ($(MEMCPY_POLICY),rockchip)
+
+include $(CLEAR_VARS)
+ifeq ($(strip $(TARGET_BOARD_HARDWARE)),rk30board)
+LOCAL_PREBUILT_LIBS := arch-arm/bionic/libmemopt-a9.a
+endif
+ifeq ($(strip $(TARGET_BOARD_HARDWARE)),rk29board)
+LOCAL_PREBUILT_LIBS := arch-arm/bionic/libmemopt-a8.a
+endif
+include $(BUILD_MULTI_PREBUILT)
+endif
 
 # ========================================================
 # libc_common.a
@@ -596,6 +616,14 @@ LOCAL_CFLAGS += -DCRT_LEGACY_WORKAROUND
 endif
 LOCAL_C_INCLUDES := $(libc_common_c_includes)
 LOCAL_MODULE := libc_common
+ifeq ($(MEMCPY_POLICY),rockchip)
+ifeq ($(strip $(TARGET_BOARD_HARDWARE)),rk30board)
+LOCAL_WHOLE_STATIC_LIBRARIES := libmemopt-a9
+endif
+ifeq ($(strip $(TARGET_BOARD_HARDWARE)),rk29board)
+LOCAL_WHOLE_STATIC_LIBRARIES := libmemopt-a8
+endif
+endif
 LOCAL_SYSTEM_SHARED_LIBRARIES :=
 
 include $(BUILD_STATIC_LIBRARY)
